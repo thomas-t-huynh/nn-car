@@ -1,5 +1,5 @@
 class Car {
-  constructor(x, y, width, height) {
+  constructor(x, y, width, height, controlType, maxSpeed = 3) {
     this.x = x;
     this.y = y;
     this.width = width;
@@ -7,16 +7,79 @@ class Car {
 
     this.speed = 0;
     this.acceleration = 0.2;
-    this.maxSpeed = 3;
+    this.maxSpeed = maxSpeed;
     this.maxReverseSpeed = -this.maxSpeed / 2;
     this.friction = 0.05;
     this.angle = 0;
+    this.damaged = false;
 
-    this.controls = new Controls();
+    if (controlType !== 'DUMMY') {
+      this.sensor = new Sensor(this);
+    }
+    this.controls = new Controls(controlType);
   }
 
-  update() {
-    this.#move();
+  update(roadBorders, traffic) {
+    if (!this.damaged) {
+      this.#move();
+      this.polygon = this.#createPolygon();
+      this.damaged = this.#assessDamage(roadBorders, traffic);
+    }
+    if (this.sensor) {
+      this.sensor.update(roadBorders, traffic);
+    }
+  }
+
+  #assessDamage(roadBorders, traffic) {
+    for (let i = 0; i < roadBorders.length; i++) {
+      if (polysIntersect(this.polygon, roadBorders[i])) {
+        return true;
+      }
+    }
+
+    for (let i = 0; i < traffic.length; i++) {
+      if (polysIntersect(this.polygon, traffic[i].polygon)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  #createPolygon() {
+    const points = [];
+    // hypot is short for hypotenuse. Get half to get half of car.
+    const rad = Math.hypot(this.width, this.height) / 2;
+    // angle - tangent angle is the width / height.
+    // arc tangent 2
+    const alpha = Math.atan2(this.width, this.height);
+
+    // top right corner.
+    points.push({
+      // combining the car angle and the alpha angle
+      x: this.x - Math.sin(this.angle - alpha) * rad,
+      y: this.y - Math.cos(this.angle - alpha) * rad,
+    });
+
+    // top left corner
+    points.push({
+      x: this.x - Math.sin(this.angle + alpha) * rad,
+      y: this.y - Math.cos(this.angle + alpha) * rad,
+    });
+
+    // bottom left corner
+    points.push({
+      // Math.PI is 180 degrees
+      x: this.x - Math.sin(Math.PI + this.angle - alpha) * rad,
+      y: this.y - Math.cos(Math.PI + this.angle - alpha) * rad,
+    });
+
+    // bottom right corner
+    points.push({
+      x: this.x - Math.sin(Math.PI + this.angle + alpha) * rad,
+      y: this.y - Math.cos(Math.PI + this.angle + alpha) * rad,
+    });
+
+    return points;
   }
 
   #move() {
@@ -61,24 +124,45 @@ class Car {
         this.angle -= 0.03 * flip;
       }
     }
-
+    // * using trig (sin, cos) will allow you to use radius
     // * sin will handle x axis movement, where as cos does y axis.
     this.x -= Math.sin(this.angle) * this.speed;
     this.y -= Math.cos(this.angle) * this.speed;
   }
 
-  draw(ctx) {
-    // * saves current state of canvas
-    ctx.save();
-    ctx.translate(this.x, this.y); // * positions car on axis.
-    ctx.rotate(-this.angle);
+  draw(ctx, color) {
+    // * old way of drawing the car. Creates rectangle, but we don't have control on corners.
+    // saves current state of canvas
+    // ctx.save();
+    // ctx.translate(this.x, this.y); // * positions car on axis.
+    // ctx.rotate(-this.angle);
 
+    // ctx.beginPath();
+    // ctx.rect(-this.width / 2, -this.height / 2, this.width, this.height);
+
+    // // * fills (draws) path and shape given before calling.
+    // ctx.fill();
+    // // * restores last saved state of canvas to maintain angle of car.
+    // ctx.restore();
+
+    if (this.damaged) {
+      ctx.fillStyle = 'gray';
+    } else {
+      ctx.fillStyle = color;
+    }
+
+    // draw out car
     ctx.beginPath();
-    ctx.rect(-this.width / 2, -this.height / 2, this.width, this.height);
+    ctx.moveTo(this.polygon[0].x, this.polygon[0].y);
+    for (let i = 1; i < this.polygon.length; i++) {
+      // i = 1 bc we already did the first one
+      ctx.lineTo(this.polygon[i].x, this.polygon[i].y);
+    }
 
-    // * fills (draws) path and shape given before calling.
     ctx.fill();
-    // * restores last saved state of canvas to maintain angle of car.
-    ctx.restore();
+
+    if (this.sensor) {
+      this.sensor.draw(ctx);
+    }
   }
 }
