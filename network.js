@@ -23,7 +23,7 @@ class Level {
     this.biases = new Array(outputCount);
 
     this.weights = [];
-    for (let i = 0; i < inputCount.length; i++) {
+    for (let i = 0; i < inputCount; i++) {
       this.weights[i] = new Array(outputCount);
     }
 
@@ -35,7 +35,7 @@ class Level {
   // initialize random weights
   static #randomize(level) {
     for (let i = 0; i < level.inputs.length; i++) {
-      for (let j = 0; j < level.ouputs.length; j++) {
+      for (let j = 0; j < level.outputs.length; j++) {
         level.weights[i][j] = Math.random() * 2 - 1;
       }
     }
@@ -56,9 +56,8 @@ class Level {
       for (let j = 0; j < level.inputs.length; j++) {
         sum += level.inputs[j] * level.weights[j][i];
       }
-
       if (sum > level.biases[i]) {
-        level.ouputs[i] = 1;
+        level.outputs[i] = 1;
       } else {
         level.outputs[i] = 0;
       }
